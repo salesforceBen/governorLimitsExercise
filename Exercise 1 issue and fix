@@ -1,0 +1,58 @@
+// Exercise 1 issue:
+Task taskObject;
+for (Contact contactObject : [SELECT Id, AccountId, LastName FROM Contact])
+{
+    taskObject = new Task(WhoId = contactObject.Id);
+    insert taskObject;
+}
+
+// Exercise 1 fix:
+List<Task> tasks = new List<Task>();
+Task taskObject;
+for (Contact contactObject : [SELECT Id, AccountId, LastName FROM Contact])
+{
+    taskObject = new Task(WhoId = contactObject.Id);
+    tasks.add(taskObject);
+}
+ 
+insert tasks;
+
+// Exercise 2 issue:
+for (Account accountObject : [SELECT Id, Description FROM Account])
+{
+    Integer countOfEvents = [SELECT COUNT() FROM EVENT WHERE WhatId =: accountObject.Id];
+    if (countOfEvents > 0)
+    {
+        accountObject.Description = String.valueOf(countOfEvents);
+    }
+    update accountObject;
+}
+
+// Exercise 2 fix:
+Map<Id, Account> accountsMap = new Map<Id, Account>([SELECT Id FROM Account]);
+Set<Id> accountsWithEvents = new Set<Id>();
+Map<String, String> eventsPerAccount = new Map<String, String>();
+List<Account> accountList = new List<Account>();
+ 
+for (Event eventObject : [SELECT Id, WhatId FROM Event WHERE WhatId IN : accountsMap.keySet()])
+{
+    accountsWithEvents.add(eventObject.WhatId);
+}
+for (AggregateResult aggregate : [SELECT COUNT(Id) theId, WhatId theWhatId FROM Event WHERE WhatId IN :accountsWithEvents GROUP BY WhatId])
+{
+    eventsPerAccount.put(String.valueOf(aggregate.get('theWhatId')), String.valueOf(aggregate.get('theId')));  
+}
+ 
+for (Account accountObject : [SELECT Id, Description FROM Account WHERE Id IN : eventsPerAccount.keySet()])
+{
+    if (accountObject.Description != eventsPerAccount.get(String.valueOf(accountObject.Id)))
+      {
+    accountObject.Description = eventsPerAccount.get(String.valueOf(accountObject.Id));
+    accountList.add(accountObject);
+      }
+}
+ 
+if (accountList.size() > 0)
+{
+    update accountList;
+}
