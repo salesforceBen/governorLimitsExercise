@@ -1,0 +1,58 @@
+// SOQL in a for loop issue:
+List<Account> accounts = [SELECT Id, Name FROM Account];
+List<Integer> contactCount = new List<Integer>();
+for (Integer i = 0; i <= accounts.size(); i++)
+{
+    Integer count = [SELECT COUNT() FROM Contact WHERE AccountId IN : accounts ];
+    contactCount.add(count);
+}
+
+// SOQL in a for loop fix:
+Map<Id, Account> accountMap = new Map<Id, Account>([SELECT Id FROM Account]);
+Map<String, Integer> accountNamesAndRespectiveContactCounts = new Map<String, Integer>();
+for(Account accountObject : [SELECT Name, (SELECT Id FROM Contacts) FROM Account WHERE Id IN :accountMap.keySet()])
+{    
+    accountNamesAndRespectiveContactCounts.put(accountObject.Name, accountObject.Contacts.size());
+}
+system.debug('accountObject map is: ' + accountNamesAndRespectiveContactCounts);
+
+// Too many DML's issue:
+List<Account> accountList = new List<Account>();
+Account accountObject;
+for (Integer i = 0; i < 150; i++)
+{
+    accountObject = new Account();
+    accountObject.Name = 'Test ' + i;
+    accountList.add(accountObject);
+}
+insert accountList;
+
+Contact contactObject;
+for (Account accountIterator : [SELECT Id, Name FROM Account])
+{
+    contactObject = new Contact();
+    contactObject.AccountId = accountIterator.Id;
+    contactObject.LastName = 'Surname ' + accountIterator.Name;
+    insert contactObject;
+}
+
+// Too many DML's fix:
+List<Contact> contactList = new List<Contact>();
+Contact contactObject;
+for (Account accountIterator : [SELECT Id, Name FROM Account LIMIT 150])
+{
+     contactObject = new Contact();
+     contactObject.AccountId = accountIterator.Id;
+     contactObject.LastName = 'Surname ' + accountIterator.Name;
+     contactList.add(contactObject);
+}
+if (contactList.size() > 0)
+{
+    insert contactList;
+}
+system.debug('Size of contact list is: ' + contactList.size());
+
+system.debug('Count of DML statements: ' + Integer.valueOf(Limits.getDmlStatements()));
+
+
+
